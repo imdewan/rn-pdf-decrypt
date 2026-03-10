@@ -1,32 +1,33 @@
-# @pdfsmaller/pdf-decrypt
+# rn-pdf-decrypt
 
-> **Fork note:** This is a fork of [@pdfsmaller/pdf-decrypt](https://www.npmjs.com/package/@pdfsmaller/pdf-decrypt) that adds support for **AES-256 V=5/R=5** (Adobe's pre-ISO extension). The upstream package only supports V=5/R=6 (ISO 32000-2). R=5 uses plain SHA-256 for password validation, while R=6 uses the iterative Algorithm 2.B. Many older PDFs encrypted by Adobe Acrobat X/XI use R=5.
+React Native compatible PDF decryption with **AES-256** and **RC4** support. Fork of [@pdfsmaller/pdf-decrypt](https://www.npmjs.com/package/@pdfsmaller/pdf-decrypt) that replaces Web Crypto API with [@noble/hashes](https://www.npmjs.com/package/@noble/hashes) + [@noble/ciphers](https://www.npmjs.com/package/@noble/ciphers) for Hermes compatibility.
 
-Full-featured PDF decryption with **AES-256** and **RC4** support. Built for browsers, Node.js 18+, Cloudflare Workers, and Deno.
+## Why this fork?
 
-Companion to [@pdfsmaller/pdf-encrypt](https://www.npmjs.com/package/@pdfsmaller/pdf-encrypt). Powers [PDFSmaller.com](https://pdfsmaller.com)'s [Unlock PDF](https://pdfsmaller.com/unlock-pdf) tool.
+The original `@pdfsmaller/pdf-decrypt` uses `crypto.subtle` (Web Crypto API), which is not available in React Native's Hermes engine. This fork swaps in pure JS crypto from the audited `@noble` libraries, making it work in React Native, Hermes, browsers, Node.js 18+, and Deno.
+
+Additionally, this fork adds support for **AES-256 V=5/R=5** (Adobe's pre-ISO extension used by Acrobat X/XI), which the upstream package does not support.
 
 ## Features
 
 - **AES-256 decryption** (V=5, R=5/6) — PDF 2.0 standard + Adobe extension
 - **RC4 40/128-bit decryption** (V=1-2, R=2-3) — legacy support
 - **User + Owner passwords** — accepts either password to decrypt
-- **Batched async decryption** — processes thousands of objects without browser freeze
-- **Web Crypto API** — no native dependencies, works everywhere
+- **React Native / Hermes compatible** — no Web Crypto API dependency
+- **Pure JS crypto** — `@noble/hashes` + `@noble/ciphers` (audited, zero-dep)
 - **Lightweight** — ~18KB total (crypto + decryption logic)
-- **Zero dependencies** — only `pdf-lib` as a peer dependency
 - **TypeScript types** included
 
 ## Installation
 
 ```bash
-npm install @pdfsmaller/pdf-decrypt pdf-lib
+npm install rn-pdf-decrypt pdf-lib
 ```
 
 ## Quick Start
 
 ```javascript
-import { decryptPDF } from '@pdfsmaller/pdf-decrypt';
+import { decryptPDF } from 'rn-pdf-decrypt';
 import fs from 'fs';
 
 const pdfBytes = fs.readFileSync('encrypted.pdf');
@@ -67,7 +68,7 @@ Check if a PDF is encrypted without attempting to decrypt it.
 ### Decrypt with Auto-Detection
 
 ```javascript
-import { decryptPDF, isEncrypted } from '@pdfsmaller/pdf-decrypt';
+import { decryptPDF, isEncrypted } from 'rn-pdf-decrypt';
 
 // Check encryption type first
 const info = await isEncrypted(pdfBytes);
@@ -77,49 +78,16 @@ if (info.encrypted) {
 }
 ```
 
-### Roundtrip with @pdfsmaller/pdf-encrypt
+### React Native Usage
 
 ```javascript
-import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
-import { decryptPDF } from '@pdfsmaller/pdf-decrypt';
+import { decryptPDF } from 'rn-pdf-decrypt';
+import RNFS from 'react-native-fs';
 
-// Encrypt
-const encrypted = await encryptPDF(pdfBytes, 'secret');
+const base64 = await RNFS.readFile(filePath, 'base64');
+const pdfBytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
 
-// Decrypt
-const decrypted = await decryptPDF(encrypted, 'secret');
-```
-
-### Browser Usage
-
-```html
-<input type="file" id="pdf-input" accept=".pdf" />
-<input type="password" id="password" placeholder="Enter password" />
-<button id="decrypt-btn">Decrypt</button>
-
-<script type="module">
-  import { decryptPDF } from '@pdfsmaller/pdf-decrypt';
-
-  document.getElementById('decrypt-btn').addEventListener('click', async () => {
-    const file = document.getElementById('pdf-input').files[0];
-    const password = document.getElementById('password').value;
-    const pdfBytes = new Uint8Array(await file.arrayBuffer());
-
-    try {
-      const decrypted = await decryptPDF(pdfBytes, password);
-
-      // Download
-      const blob = new Blob([decrypted], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'decrypted.pdf';
-      a.click();
-    } catch (e) {
-      alert(e.message);
-    }
-  });
-</script>
+const decrypted = await decryptPDF(pdfBytes, 'my-password');
 ```
 
 ## Supported Encryption
@@ -132,27 +100,17 @@ const decrypted = await decryptPDF(encrypted, 'secret');
 | RC4 (V=1, R=2) | 1.1+ | 40-bit | Supported |
 | AES-128 (V=4, R=4) | 1.6+ | 128-bit | Not yet supported |
 
-## Comparison with pdf-decrypt-lite
+## Differences from upstream
 
-| Feature | pdf-decrypt | pdf-decrypt-lite |
-|---------|-------------|-----------------|
-| AES-256 | Yes | No |
-| RC4 128-bit | Yes | Yes |
-| RC4 40-bit | Yes | Yes |
-| Batched async | Yes | No (sync only) |
-| Size | ~18KB | ~8KB |
-| Use case | Full decryption | RC4-only, minimal |
-
-Choose `pdf-decrypt-lite` if you only need RC4 and want the smallest possible bundle. Choose `pdf-decrypt` for full AES-256 + RC4 support.
-
-## Related Packages
-
-| Package | Description |
-|---------|-------------|
-| [@pdfsmaller/pdf-encrypt](https://www.npmjs.com/package/@pdfsmaller/pdf-encrypt) | Full encryption — AES-256 + RC4 (companion to this package) |
-| [@pdfsmaller/pdf-encrypt-lite](https://www.npmjs.com/package/@pdfsmaller/pdf-encrypt-lite) | Lightweight RC4-only encryption (~7KB) |
-| [@pdfsmaller/pdf-decrypt-lite](https://www.npmjs.com/package/@pdfsmaller/pdf-decrypt-lite) | Lightweight RC4-only decryption (~8KB) |
+| | `@pdfsmaller/pdf-decrypt` | `rn-pdf-decrypt` |
+|---|---|---|
+| Crypto backend | Web Crypto API (`crypto.subtle`) | `@noble/hashes` + `@noble/ciphers` |
+| React Native | No (Hermes lacks Web Crypto) | Yes |
+| AES-256 V=5/R=5 | No | Yes |
+| Dependencies | Zero (peer: pdf-lib) | `@noble/hashes`, `@noble/ciphers` (peer: pdf-lib) |
 
 ## License
 
-MIT — [PDFSmaller.com](https://pdfsmaller.com)
+MIT
+
+Based on [@pdfsmaller/pdf-decrypt](https://www.npmjs.com/package/@pdfsmaller/pdf-decrypt) by [PDFSmaller.com](https://pdfsmaller.com).

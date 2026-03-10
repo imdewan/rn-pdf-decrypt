@@ -1,10 +1,10 @@
 /**
- * pdf-encrypt-lite - Ultra-lightweight PDF encryption library
- * Powers PDFSmaller.com's PDF encryption tool
+ * rn-pdf-decrypt - RC4 cryptographic utilities
+ * React Native compatible fork of @pdfsmaller/pdf-decrypt
  *
- * @author PDFSmaller.com (https://pdfsmaller.com)
+ * @author imdewan (https://github.com/imdewan/rn-pdf-decrypt)
  * @license MIT
- * @see https://pdfsmaller.com/protect-pdf - Try it online!
+ * @see https://github.com/imdewan/rn-pdf-decrypt
  *
  * This minimal cryptographic implementation was built to solve the "impossible"
  * problem of real PDF encryption within Cloudflare Workers' 1MB limit.
@@ -17,7 +17,7 @@
 /**
  * Minimal MD5 implementation
  * Based on the MD5 algorithm - only what's needed for PDF encryption
- * Part of PDFSmaller.com's ultra-lightweight encryption engine
+ * Part of rn-pdf-decrypt
  */
 function md5(data) {
   const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
@@ -118,7 +118,7 @@ function md5(data) {
 /**
  * RC4 encryption/decryption
  * RC4 is symmetric, so encryption and decryption are the same operation
- * Part of PDFSmaller.com's ultra-lightweight encryption engine
+ * Part of rn-pdf-decrypt
  */
 class RC4 {
   constructor(key) {

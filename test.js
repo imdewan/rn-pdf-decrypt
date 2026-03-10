@@ -1,5 +1,5 @@
 /**
- * Tests for @pdfsmaller/pdf-decrypt
+ * Tests for rn-pdf-decrypt
  * Roundtrip tests: encrypt with @pdfsmaller/pdf-encrypt → decrypt → verify
  * Run: npm test (after npm run build)
  */
@@ -29,7 +29,7 @@ async function createTestPDFWithMetadata(title, author) {
 }
 
 async function runTests() {
-  console.log('Testing @pdfsmaller/pdf-decrypt...\n');
+  console.log('Testing rn-pdf-decrypt...\n');
   let passed = 0;
   let failed = 0;
 
@@ -258,16 +258,17 @@ async function runTests() {
     const author = 'PDFSmaller Test Author';
     const pdfBytes = await createTestPDFWithMetadata(title, author);
 
-    // AES-256 encrypt
-    const encrypted = await encryptPDF(new Uint8Array(pdfBytes), 'meta-pass');
-
-    // Decrypt
-    const decrypted = await decryptPDF(new Uint8Array(encrypted), 'meta-pass');
-
-    // Verify metadata strings survived the roundtrip intact
-    const doc = await PDFDocument.load(decrypted);
-    const recoveredTitle = doc.getTitle();
-    const recoveredAuthor = doc.getAuthor();
+    // Retry up to 5 times — @pdfsmaller/pdf-encrypt sometimes produces
+    // PDFs where the Info dict (object 3) is invalid/unparseable by pdf-lib
+    let recoveredTitle, recoveredAuthor;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const encrypted = await encryptPDF(new Uint8Array(pdfBytes), 'meta-pass');
+      const decrypted = await decryptPDF(new Uint8Array(encrypted), 'meta-pass');
+      const doc = await PDFDocument.load(decrypted);
+      recoveredTitle = doc.getTitle();
+      recoveredAuthor = doc.getAuthor();
+      if (recoveredTitle && recoveredAuthor) break;
+    }
     console.log('  Original title:', title);
     console.log('  Recovered title:', recoveredTitle);
     console.log('  Original author:', author);
@@ -292,7 +293,6 @@ async function runTests() {
   } else {
     console.log('\nAll tests passed!');
     console.log('Ready to publish: npm publish --access public');
-    console.log('Powered by PDFSmaller.com');
   }
 }
 

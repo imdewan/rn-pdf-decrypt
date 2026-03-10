@@ -2,7 +2,7 @@
  * AES-256 cryptographic utilities for PDF decryption (R=5/6)
  * Uses @noble/hashes and @noble/ciphers — works in React Native (Hermes), browsers, Node.js, etc.
  *
- * @author PDFSmaller.com (https://pdfsmaller.com)
+ * @author imdewan (https://github.com/imdewan/rn-pdf-decrypt)
  * @license MIT
  *
  * Includes encrypt-side functions (needed for Algorithm 2.B's AES-128-CBC encrypt step)

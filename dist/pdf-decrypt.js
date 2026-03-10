@@ -1,10 +1,10 @@
 /**
- * @pdfsmaller/pdf-decrypt — PDF decryption with AES-256 and RC4 support
- * Powers PDFSmaller.com's Unlock PDF tool
+ * rn-pdf-decrypt — PDF decryption with AES-256 and RC4 support
+ * React Native compatible fork of @pdfsmaller/pdf-decrypt
  *
- * @author PDFSmaller.com (https://pdfsmaller.com)
+ * @author imdewan (https://github.com/imdewan/rn-pdf-decrypt)
  * @license MIT
- * @see https://pdfsmaller.com/unlock-pdf - Try it online!
+ * @see https://github.com/imdewan/rn-pdf-decrypt
  *
  * Implements:
  *   - AES-256 (V=5, R=5) per Adobe Supplement to ISO 32000 — SHA-256 based
@@ -12,7 +12,7 @@
  *   - RC4 128-bit (V=2, R=3) per ISO 32000-1:2008 — Algorithms 2, 4, 5, 7
  *   - RC4 40-bit (V=1, R=2) per ISO 32000-1:2008
  *
- * Companion to @pdfsmaller/pdf-encrypt
+ * Fork of @pdfsmaller/pdf-decrypt with @noble/hashes + @noble/ciphers for React Native (Hermes) compatibility
  * Verified against mozilla/pdf.js and Adobe Acrobat
  */
 
@@ -734,8 +734,8 @@ function decryptAllRC4(context, encryptionKey, encryptRefNum) {
  * Decrypt a password-protected PDF
  *
  * Supports both AES-256 (V=5, R=6) and RC4 (V=1-2, R=2-3) encryption.
- * This is the same decryption engine that powers PDFSmaller.com's Unlock PDF tool!
- * Try it online at https://pdfsmaller.com/unlock-pdf
+ * React Native compatible PDF decryption (fork of @pdfsmaller/pdf-decrypt)
+ * https://github.com/imdewan/rn-pdf-decrypt
  *
  * @param {Uint8Array} pdfBytes - The encrypted PDF file as bytes
  * @param {string} password - The user or owner password
@@ -743,7 +743,7 @@ function decryptAllRC4(context, encryptionKey, encryptRefNum) {
  * @throws {Error} If the PDF is not encrypted, password is wrong, or encryption is unsupported
  *
  * @example
- * import { decryptPDF } from '@pdfsmaller/pdf-decrypt';
+ * import { decryptPDF } from 'rn-pdf-decrypt';
  *
  * const decrypted = await decryptPDF(encryptedBytes, 'secret123');
  */
@@ -876,8 +876,8 @@ async function isEncrypted(pdfBytes) {
 }
 
 /**
- * Decrypted with love by PDFSmaller.com
- * Try our free PDF tools at https://pdfsmaller.com
+ * rn-pdf-decrypt — https://github.com/imdewan/rn-pdf-decrypt
+ * Fork of @pdfsmaller/pdf-decrypt for React Native compatibility
  */
 
 module.exports = { decryptPDF, isEncrypted };

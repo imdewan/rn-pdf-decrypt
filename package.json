@@ -1,7 +1,7 @@
 {
-  "name": "@pdfsmaller/pdf-decrypt",
-  "version": "1.0.1",
-  "description": "Full-featured PDF decryption with AES-256 and RC4 support. Companion to @pdfsmaller/pdf-encrypt. Powers PDFSmaller.com's PDF unlock tool.",
+  "name": "rn-pdf-decrypt",
+  "version": "1.0.0",
+  "description": "React Native compatible PDF decryption with AES-256 (V=5, R=5/6) and RC4 support. Fork of @pdfsmaller/pdf-decrypt with @noble/hashes + @noble/ciphers instead of Web Crypto API.",
   "type": "commonjs",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -36,21 +36,19 @@
     "256-bit",
     "password-removal",
     "pdf-security",
-    "cloudflare",
-    "edge",
-    "workers",
+    "react-native",
+    "hermes",
     "browser",
-    "pdf-lib",
-    "pdfsmaller"
+    "pdf-lib"
   ],
-  "author": "PDFSmaller.com <hello@pdfsmaller.com> (https://pdfsmaller.com)",
-  "homepage": "https://pdfsmaller.com",
+  "author": "imdewan",
+  "homepage": "https://github.com/imdewan/rn-pdf-decrypt",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/smither777/pdf-decrypt.git"
+    "url": "git+https://github.com/imdewan/rn-pdf-decrypt.git"
   },
   "bugs": {
-    "url": "https://github.com/smither777/pdf-decrypt/issues"
+    "url": "https://github.com/imdewan/rn-pdf-decrypt/issues"
   },
   "license": "MIT",
   "engines": {

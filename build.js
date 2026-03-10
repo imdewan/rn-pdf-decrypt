@@ -1,5 +1,5 @@
 /**
- * Build script for @pdfsmaller/pdf-decrypt
+ * Build script for rn-pdf-decrypt
  * Produces CJS, ESM, and TypeScript declarations
  */
 
@@ -126,7 +126,7 @@ export declare function concat(...arrays: Uint8Array[]): Uint8Array;
 }
 
 // Build all
-console.log('Building @pdfsmaller/pdf-decrypt...');
+console.log('Building rn-pdf-decrypt...');
 buildCJS();
 buildESM();
 buildTypes();
