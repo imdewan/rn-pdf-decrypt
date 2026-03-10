@@ -7,6 +7,7 @@
  * @see https://pdfsmaller.com/unlock-pdf - Try it online!
  *
  * Implements:
+ *   - AES-256 (V=5, R=5) per Adobe Supplement to ISO 32000 — SHA-256 based
  *   - AES-256 (V=5, R=6) per ISO 32000-2:2020 — Algorithms 2.A, 2.B, 11, 12, 13
  *   - RC4 128-bit (V=2, R=3) per ISO 32000-1:2008 — Algorithms 2, 4, 5, 7
  *   - RC4 40-bit (V=1, R=2) per ISO 32000-1:2008
@@ -157,8 +158,8 @@ function readEncryptParams(context) {
     encryptDict
   };
 
-  // V=5, R=6: AES-256 specific fields
-  if (version === 5 && revision === 6) {
+  // V=5, R=5/6: AES-256 specific fields
+  if (version === 5 && (revision === 5 || revision === 6)) {
     const OE = encryptDict.get(PDFName.of('OE'));
     const UE = encryptDict.get(PDFName.of('UE'));
     const Perms = encryptDict.get(PDFName.of('Perms'));
@@ -191,7 +192,7 @@ function readEncryptParams(context) {
   } else {
     throw new Error(
       `Unsupported encryption: V=${version}, R=${revision}. ` +
-      `pdf-decrypt supports RC4 (V=1-2, R=2-3) and AES-256 (V=5, R=6).`
+      `pdf-decrypt supports RC4 (V=1-2, R=2-3) and AES-256 (V=5, R=5/6).`
     );
   }
 
@@ -411,20 +412,33 @@ function decryptStringsRC4(obj, objectNum, generationNum, encryptionKey) {
 // ========== AES-256 Password Validation ==========
 
 /**
- * Validate user password for AES-256 (Algorithm 11 / ISO 32000-2)
+ * Compute the password hash for AES-256, dispatching to the correct algorithm
+ * based on revision:
+ *   - R=5 (Adobe extension): SHA-256(password + salt + extra)
+ *   - R=6 (ISO 32000-2): Algorithm 2.B (iterative hash)
+ */
+async function aes256PasswordHash(password, salt, extra, revision) {
+  if (revision === 5) {
+    return sha256(concat(password, salt, extra));
+  }
+  return computeHash2B(password, salt, extra);
+}
+
+/**
+ * Validate user password for AES-256 (R=5: Adobe extension / R=6: Algorithm 11)
  *
  * Steps:
- * 1. hash2B(password, U[32:40], []) → compare with U[0:32]
- * 2. If match: hash2B(password, U[40:48], []) → decrypt UE → file key
+ * 1. hash(password, U[32:40], []) → compare with U[0:32]
+ * 2. If match: hash(password, U[40:48], []) → decrypt UE → file key
  *
  * @returns {Promise<Uint8Array|null>} - 32-byte file key if valid, null if invalid
  */
 async function validateUserPasswordAES256(password, encryptParams) {
-  const { userKey, userEncryptKey } = encryptParams;
+  const { userKey, userEncryptKey, revision } = encryptParams;
 
   // U validation salt = U[32:40]
   const validationSalt = userKey.slice(32, 40);
-  const hash = await computeHash2B(password, validationSalt, new Uint8Array(0));
+  const hash = await aes256PasswordHash(password, validationSalt, new Uint8Array(0), revision);
 
   // Compare hash with U[0:32]
   if (!arraysEqual(hash, userKey.slice(0, 32))) {
@@ -434,7 +448,7 @@ async function validateUserPasswordAES256(password, encryptParams) {
   // Password valid — derive file key from UE
   // Key salt = U[40:48]
   const keySalt = userKey.slice(40, 48);
-  const ueKey = await computeHash2B(password, keySalt, new Uint8Array(0));
+  const ueKey = await aes256PasswordHash(password, keySalt, new Uint8Array(0), revision);
   const zeroIV = new Uint8Array(16);
   const fileKey = await aes256CbcDecryptNoPad(userEncryptKey, ueKey, zeroIV);
 
@@ -442,20 +456,20 @@ async function validateUserPasswordAES256(password, encryptParams) {
 }
 
 /**
- * Validate owner password for AES-256 (Algorithm 12 / ISO 32000-2)
+ * Validate owner password for AES-256 (R=5: Adobe extension / R=6: Algorithm 12)
  *
  * Steps:
- * 1. hash2B(password, O[32:40], U) → compare with O[0:32]
- * 2. If match: hash2B(password, O[40:48], U) → decrypt OE → file key
+ * 1. hash(password, O[32:40], U) → compare with O[0:32]
+ * 2. If match: hash(password, O[40:48], U) → decrypt OE → file key
  *
  * @returns {Promise<Uint8Array|null>} - 32-byte file key if valid, null if invalid
  */
 async function validateOwnerPasswordAES256(password, encryptParams) {
-  const { ownerKey, userKey, ownerEncryptKey } = encryptParams;
+  const { ownerKey, userKey, ownerEncryptKey, revision } = encryptParams;
 
   // O validation salt = O[32:40], userKey = full 48-byte U value
   const validationSalt = ownerKey.slice(32, 40);
-  const hash = await computeHash2B(password, validationSalt, userKey);
+  const hash = await aes256PasswordHash(password, validationSalt, userKey, revision);
 
   // Compare hash with O[0:32]
   if (!arraysEqual(hash, ownerKey.slice(0, 32))) {
@@ -465,7 +479,7 @@ async function validateOwnerPasswordAES256(password, encryptParams) {
   // Password valid — derive file key from OE
   // Key salt = O[40:48]
   const keySalt = ownerKey.slice(40, 48);
-  const oeKey = await computeHash2B(password, keySalt, userKey);
+  const oeKey = await aes256PasswordHash(password, keySalt, userKey, revision);
   const zeroIV = new Uint8Array(16);
   const fileKey = await aes256CbcDecryptNoPad(ownerEncryptKey, oeKey, zeroIV);
 
