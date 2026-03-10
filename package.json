@@ -60,7 +60,11 @@
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
-    "pdf-lib": "^1.17.1",
-    "@pdfsmaller/pdf-encrypt": "^1.0.0"
+    "@pdfsmaller/pdf-encrypt": "^1.0.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.1.1",
+    "@noble/hashes": "^2.0.1"
   }
 }

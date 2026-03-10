@@ -1,6 +1,6 @@
 /**
- * AES-256 cryptographic utilities for PDF decryption (R=6)
- * Uses Web Crypto API — works in browsers, Cloudflare Workers, Deno, Node 18+
+ * AES-256 cryptographic utilities for PDF decryption (R=5/6)
+ * Uses @noble/hashes and @noble/ciphers — works in React Native (Hermes), browsers, Node.js, etc.
  *
  * @author PDFSmaller.com (https://pdfsmaller.com)
  * @license MIT
@@ -11,6 +11,9 @@
  * Implements Algorithm 2.B from ISO 32000-2:2020
  * Verified against mozilla/pdf.js (the reference implementation)
  */
+
+const { sha256: _sha256, sha384: _sha384, sha512: _sha512 } = require('@noble/hashes/sha2.js');
+const { cbc, ecb } = require('@noble/ciphers/aes.js');
 
 /**
  * Concatenate multiple Uint8Arrays
@@ -26,24 +29,21 @@ function concat(...arrays) {
   return result;
 }
 
-// ========== SHA Hash Functions (Web Crypto) ==========
+// ========== SHA Hash Functions (@noble/hashes) ==========
 
 async function sha256(data) {
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return new Uint8Array(hash);
+  return _sha256(data);
 }
 
 async function sha384(data) {
-  const hash = await crypto.subtle.digest('SHA-384', data);
-  return new Uint8Array(hash);
+  return _sha384(data);
 }
 
 async function sha512(data) {
-  const hash = await crypto.subtle.digest('SHA-512', data);
-  return new Uint8Array(hash);
+  return _sha512(data);
 }
 
-// ========== AES Encryption (Web Crypto) ==========
+// ========== AES Encryption (@noble/ciphers) ==========
 // These encrypt functions are needed because Algorithm 2.B uses aes128CbcEncrypt
 // even during the decryption password validation flow.
 
@@ -52,17 +52,14 @@ async function sha512(data) {
  * Strips PKCS#7 padding since input is always block-aligned
  */
 async function aes128CbcEncrypt(data, key, iv) {
-  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['encrypt']);
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, cryptoKey, data);
-  // Strip PKCS#7 padding block (data is always block-aligned in Algorithm 2.B)
-  return new Uint8Array(encrypted).slice(0, data.byteLength);
+  const cipher = cbc(key, iv, { disablePadding: true });
+  return cipher.encrypt(data);
 }
 
-// ========== AES Decryption (Web Crypto) ==========
+// ========== AES Decryption (@noble/ciphers) ==========
 
 /**
  * AES-256-CBC decrypt with PKCS#7 padding removal (for per-object decryption)
- * Standard Web Crypto decrypt — handles padding automatically.
  *
  * @param {Uint8Array} data - Ciphertext (must be multiple of 16 bytes)
  * @param {Uint8Array} key - 32-byte AES-256 key
@@ -70,29 +67,12 @@ async function aes128CbcEncrypt(data, key, iv) {
  * @returns {Promise<Uint8Array>} - Decrypted plaintext
  */
 async function aes256CbcDecrypt(data, key, iv) {
-  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['decrypt']);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, cryptoKey, data);
-  return new Uint8Array(decrypted);
+  const cipher = cbc(key, iv);
+  return cipher.decrypt(data);
 }
 
 /**
  * AES-256-CBC decrypt without padding (for UE/OE — exactly 32 bytes, no PKCS#7)
- *
- * Web Crypto mandates PKCS#7 padding and has no "no-padding" option.
- * We use a forged padding block trick:
- *
- * 1. Take the last ciphertext block C_last
- * 2. XOR it with [0x10 * 16] (the PKCS#7 padding for a full block)
- * 3. AES-ECB encrypt the result: C_fake = AES_ENC_K(C_last XOR [0x10*16])
- * 4. Append C_fake to the ciphertext
- * 5. Web Crypto decrypts all blocks and finds valid PKCS#7 padding in C_fake
- * 6. Result = correctly decrypted original bytes (32 bytes for UE/OE)
- *
- * Why this works:
- *   AES_DEC(C_fake) XOR C_last
- *   = AES_DEC(AES_ENC(C_last XOR [0x10*16])) XOR C_last
- *   = (C_last XOR [0x10*16]) XOR C_last
- *   = [0x10*16]  ← valid PKCS#7 padding!
  *
  * @param {Uint8Array} ciphertext - Ciphertext (32 bytes for UE/OE)
  * @param {Uint8Array} key - 32-byte AES-256 key
@@ -100,65 +80,45 @@ async function aes256CbcDecrypt(data, key, iv) {
  * @returns {Promise<Uint8Array>} - Decrypted plaintext (same length as ciphertext)
  */
 async function aes256CbcDecryptNoPad(ciphertext, key, iv) {
-  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['encrypt', 'decrypt']);
-
-  // Get the last ciphertext block
-  const lastBlock = ciphertext.slice(ciphertext.length - 16);
-
-  // XOR with PKCS#7 full-block padding value (0x10 = 16)
-  const xored = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) {
-    xored[i] = lastBlock[i] ^ 0x10;
-  }
-
-  // AES-ECB encrypt the XORed block (CBC with zero IV = ECB for single block)
-  const zeroIV = new Uint8Array(16);
-  const encResult = await crypto.subtle.encrypt({ name: 'AES-CBC', iv: zeroIV }, cryptoKey, xored);
-  const cFake = new Uint8Array(encResult).slice(0, 16);
-
-  // Append forged block to ciphertext
-  const extended = concat(ciphertext, cFake);
-
-  // Decrypt — Web Crypto will find valid PKCS#7 padding and strip it
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, cryptoKey, extended);
-  return new Uint8Array(decrypted).slice(0, ciphertext.length);
+  const cipher = cbc(key, iv, { disablePadding: true });
+  return cipher.decrypt(ciphertext);
 }
 
 /**
  * AES-256-ECB decrypt a single 16-byte block (for Perms verification)
- * Uses the same forged padding block trick as aes256CbcDecryptNoPad.
  *
  * @param {Uint8Array} block - 16-byte ciphertext block
  * @param {Uint8Array} key - 32-byte AES-256 key
  * @returns {Promise<Uint8Array>} - 16-byte decrypted block
  */
 async function aes256EcbDecryptBlock(block, key) {
-  const zeroIV = new Uint8Array(16);
-  return aes256CbcDecryptNoPad(block, key, zeroIV);
+  const cipher = ecb(key, { disablePadding: true });
+  return cipher.decrypt(block);
 }
 
 /**
- * Import an AES-256 key for reuse across multiple decrypt operations
+ * Import an AES-256 key for reuse across multiple decrypt operations.
+ * With @noble/ciphers there's no CryptoKey concept — just return the raw key bytes.
  *
  * @param {Uint8Array} key - 32-byte AES-256 key
- * @returns {Promise<CryptoKey>} - Imported CryptoKey for decryption
+ * @returns {Promise<Uint8Array>} - The same key bytes (for API compatibility)
  */
 async function importAES256DecryptKey(key) {
-  return await crypto.subtle.importKey('raw', key, 'AES-CBC', false, ['encrypt', 'decrypt']);
+  return key;
 }
 
 /**
- * AES-256-CBC decrypt using a pre-imported CryptoKey (for per-object bulk decryption)
+ * AES-256-CBC decrypt using a pre-imported key (for per-object bulk decryption)
  * Handles PKCS#7 padding removal automatically.
  *
  * @param {Uint8Array} data - Ciphertext (must be multiple of 16 bytes)
- * @param {CryptoKey} cryptoKey - Pre-imported AES-256 CryptoKey
+ * @param {Uint8Array} key - Raw 32-byte AES-256 key
  * @param {Uint8Array} iv - 16-byte initialization vector
  * @returns {Promise<Uint8Array>} - Decrypted plaintext
  */
-async function aes256CbcDecryptWithKey(data, cryptoKey, iv) {
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-CBC', iv }, cryptoKey, data);
-  return new Uint8Array(decrypted);
+async function aes256CbcDecryptWithKey(data, key, iv) {
+  const cipher = cbc(key, iv);
+  return cipher.decrypt(data);
 }
 
 // ========== Algorithm 2.B (ISO 32000-2:2020) ==========

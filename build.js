@@ -29,6 +29,10 @@ function buildCJS() {
   rc4 += '\nmodule.exports = { md5, RC4, hexToBytes, bytesToHex };\n';
 
   let aes = cryptoAES
+    .replace(/import\s*\{[^}]+\}\s*from\s*'@noble\/hashes\/sha2\.js';/,
+      "const { sha256: _sha256, sha384: _sha384, sha512: _sha512 } = require('@noble/hashes/sha2.js');")
+    .replace(/import\s*\{[^}]+\}\s*from\s*'@noble\/ciphers\/aes\.js';/,
+      "const { cbc, ecb } = require('@noble/ciphers/aes.js');")
     .replace(/^export\s+/gm, '')
     .replace(/^export\s+async\s+function/gm, 'async function');
   aes += '\nmodule.exports = { sha256, sha384, sha512, aes128CbcEncrypt, aes256CbcDecrypt, aes256CbcDecryptNoPad, aes256EcbDecryptBlock, importAES256DecryptKey, aes256CbcDecryptWithKey, computeHash2B, concat };\n';
@@ -112,8 +116,8 @@ export declare function sha512(data: Uint8Array): Promise<Uint8Array>;
 export declare function aes256CbcDecrypt(data: Uint8Array, key: Uint8Array, iv: Uint8Array): Promise<Uint8Array>;
 export declare function aes256CbcDecryptNoPad(ciphertext: Uint8Array, key: Uint8Array, iv: Uint8Array): Promise<Uint8Array>;
 export declare function aes256EcbDecryptBlock(block: Uint8Array, key: Uint8Array): Promise<Uint8Array>;
-export declare function importAES256DecryptKey(key: Uint8Array): Promise<CryptoKey>;
-export declare function aes256CbcDecryptWithKey(data: Uint8Array, cryptoKey: CryptoKey, iv: Uint8Array): Promise<Uint8Array>;
+export declare function importAES256DecryptKey(key: Uint8Array): Promise<Uint8Array>;
+export declare function aes256CbcDecryptWithKey(data: Uint8Array, key: Uint8Array, iv: Uint8Array): Promise<Uint8Array>;
 export declare function computeHash2B(password: Uint8Array, salt: Uint8Array, userKey: Uint8Array): Promise<Uint8Array>;
 export declare function concat(...arrays: Uint8Array[]): Uint8Array;
 `.trim() + '\n';
