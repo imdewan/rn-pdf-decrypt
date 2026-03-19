@@ -21,7 +21,7 @@ Additionally, this fork adds support for **AES-256 V=5/R=5** (Adobe's pre-ISO ex
 ## Installation
 
 ```bash
-npm install rn-pdf-decrypt
+npm install rn-pdf-decrypt pdf-lib
 ```
 
 ## Quick Start
